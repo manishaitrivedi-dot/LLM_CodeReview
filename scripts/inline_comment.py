@@ -1,4 +1,4 @@
-import os, json, requests
+import os, sys ,json, requests
 
 # Configuration - Dynamic for new repo
 GH_TOKEN = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
