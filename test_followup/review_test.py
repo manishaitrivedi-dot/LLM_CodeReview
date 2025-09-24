@@ -24,18 +24,15 @@ def load_config(path):
 
 # --- Example of Worsened issue ---
 def duplicate_block(x):
-    # Made WORSE → added even more duplication
-    if x > 0:
-        return x * 2
-    if x > 0:
-        return x * 2
-    if x > 0:
-        return x * 2
-    if x > 0:
-        return x * 2
-    if x > 0:
-        return x * 2   # extra copy
+    # Made even worse: now repeated 6 times instead of 4
+    if x > 0: return x * 2
+    if x > 0: return x * 2
+    if x > 0: return x * 2
+    if x > 0: return x * 2
+    if x > 0: return x * 2
+    if x > 0: return x * 2
     return x
+
 
 # --- Example of No Longer Applicable issue ---
 # Removed legacy_feature entirely → should now be classified as No longer Applicable
