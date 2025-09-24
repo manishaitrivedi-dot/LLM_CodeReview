@@ -89,7 +89,7 @@ def format_executive_pr_display(json_response: dict, processed_files: list, curr
 """
         for issue in previous_issues:
             status = issue.get("status", "UNKNOWN")
-            status_emoji = {"RESOLVED": "✅", "PARTIALLY_RESOLVED": "⚠️", "NOT_ADDRESSED": "❌", "WORSENED": "🔴"}.get(status, "❓")
+            status_emoji = {"RESOLVED": "✅", "PARTIALLY_RESOLVED": "⚠️", "NOT_ADDRESSED": "❌", "WORSENED": "🔴", "NO_LONGER_APPLICABLE": "🚫"}.get(status, "❓")
            
             original_display = issue.get("original_issue", "")
             filename = issue.get("filename", "N/A")  # ENHANCED: Include filename
