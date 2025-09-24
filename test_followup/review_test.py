@@ -1,30 +1,30 @@
-# review_test.py
-# Purpose: Test file for validating follow-up review classification logic.
+# review_test.py (2nd commit)
+# Purpose: Modified version to trigger follow-up review classification checks
 
 import json
-# Past issue: unused imports
-# FIXED → should be classified as Resolved
+import logging   # Added a useful import (shows cleanup of unused imports)
 
-# --- Example of Not Addressed issue ---
-def unsafe_concat_query(table, column, value):
-    # Old flagged issue: SQL injection risk → still present
-    query = f"SELECT {column} FROM {table} WHERE value = '{value}'"
-    return query
+# --- Example of Resolved issue ---
+def safe_concat_query(table, column, value):
+    # FIXED: Previously unsafe SQL injection
+    # Now uses parameterized query (Resolved)
+    return ("SELECT {col} FROM {tbl} WHERE value = %s", (value,), {"tbl": table, "col": column})
 
 # --- Example of Partially Resolved issue ---
 def load_config(path):
     try:
-        # Previously: no error handling at all
-        # Now: basic try/except but too generic → only partially resolved
+        # Improvement: Now handling specific FileNotFoundError
+        # BUT still too broad on generic Exception → Partially Resolved
         with open(path, "r") as f:
             return json.load(f)
-    except Exception:
-        print("Error loading config")
+    except FileNotFoundError:
+        logging.error("Config file not found: %s", path)
+    except Exception as e:
+        logging.error("Unexpected error: %s", e)
 
 # --- Example of Worsened issue ---
 def duplicate_block(x):
-    # Old issue: duplication in logic
-    # Now made worse → copy-paste repeated 4 times
+    # Made WORSE → added even more duplication
     if x > 0:
         return x * 2
     if x > 0:
@@ -33,9 +33,9 @@ def duplicate_block(x):
         return x * 2
     if x > 0:
         return x * 2
+    if x > 0:
+        return x * 2   # extra copy
     return x
 
 # --- Example of No Longer Applicable issue ---
-def legacy_feature():
-    # Function body removed → issue is no longer applicable
-    pass
+# Removed legacy_feature entirely → should now be classified as No longer Applicable
