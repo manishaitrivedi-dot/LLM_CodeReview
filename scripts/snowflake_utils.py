@@ -262,8 +262,12 @@ def store_review_log(session, database_available, current_database, current_sche
         traceback.print_exc()
         return False
 
-def get_previous_review(session, database_available, current_database, current_schema, pull_request_number):
-    """ENHANCED: Get previous review with line numbers and filenames from detailed findings"""
+# FIXED FUNCTION: Filter by current files being reviewed
+def get_previous_review(session, database_available, current_database, current_schema, pull_request_number, current_files_being_reviewed):
+    """
+    FIXED: Get previous review with line numbers and filenames FILTERED by current files
+    Only returns previous issues for files that are being reviewed in the current iteration
+    """
     if not database_available:
         return None
        
@@ -287,18 +291,38 @@ def get_previous_review(session, database_available, current_database, current_s
             # Extract from VARIANT columns properly
             review_summary = json.loads(str(row['REVIEW_SUMMARY'])) if row['REVIEW_SUMMARY'] else {}
             findings_json = json.loads(str(row['DETAILED_FINDINGS_JSON'])) if row['DETAILED_FINDINGS_JSON'] else []
+            
+            # CRITICAL FIX: Filter findings to only include files being reviewed currently
+            current_file_basenames = [os.path.basename(f) if '/' in f or '\\' in f else f for f in current_files_being_reviewed]
+            print(f"  📋 Current files being reviewed: {current_file_basenames}")
+            
+            filtered_findings = []
+            for finding in findings_json:
+                finding_filename = finding.get('filename', 'N/A')
+                if finding_filename in current_file_basenames:
+                    filtered_findings.append(finding)
+                    print(f"    ✓ Including previous finding from {finding_filename}")
+                else:
+                    print(f"    ✗ Excluding previous finding from {finding_filename} (not in current review)")
+            
+            print(f"  📊 Filtered findings: {len(filtered_findings)} out of {len(findings_json)} previous findings")
+            
+            # If no relevant previous findings, return None
+            if not filtered_findings:
+                print("  📋 No previous findings for currently reviewed files - treating as initial review")
+                return None
            
-            # Build detailed previous context with line numbers and filenames
+            # Build detailed previous context with line numbers and filenames - ONLY for current files
             previous_context = f"""Previous Review Summary:
 {json.dumps(review_summary, indent=2)[:1500]}
 
-Previous Detailed Findings with Line Numbers and Filenames:
+Previous Detailed Findings for Currently Reviewed Files:
 """
            
-            # Include line numbers, filenames and detailed info for each finding
-            for i, finding in enumerate(findings_json[:10]):  # Limit to first 10 findings
+            # Include line numbers, filenames and detailed info for each FILTERED finding
+            for i, finding in enumerate(filtered_findings[:10]):  # Limit to first 10 findings
                 line_num = finding.get('line_number', 'N/A')
-                filename = finding.get('filename', 'N/A')  # ENHANCED: Include filename
+                filename = finding.get('filename', 'N/A')
                 severity = finding.get('severity', 'Unknown')
                 issue = finding.get('finding', 'No description')[:100]  # Truncate long descriptions
                
@@ -306,7 +330,7 @@ Previous Detailed Findings with Line Numbers and Filenames:
 {i+1}. [{severity}] {filename}:{line_num} - {issue}
 """
            
-            print(f"  📋 Retrieved previous review from {row['REVIEW_TIMESTAMP']} with line numbers and filenames")
+            print(f"  📋 Retrieved {len(filtered_findings)} relevant previous findings from {row['REVIEW_TIMESTAMP']}")
             return previous_context
         else:
             print("  📋 No previous review found for this PR")
@@ -316,8 +340,11 @@ Previous Detailed Findings with Line Numbers and Filenames:
         print(f"  ⚠️ Error retrieving previous review: {e}")
         return None
 
-def fetch_last_review_for_comparison(session, database_available, current_database, current_schema, pr_number):
-    """Fetches the most recent review for a given PR number for comparison purposes"""
+# FIXED FUNCTION: Filter by current files being reviewed
+def fetch_last_review_for_comparison(session, database_available, current_database, current_schema, pr_number, current_files_being_reviewed):
+    """
+    FIXED: Fetches the most recent review FILTERED by current files for comparison purposes
+    """
     if not database_available:
         return None
        
@@ -337,16 +364,33 @@ def fetch_last_review_for_comparison(session, database_available, current_databa
        
         if result:
             row = result[0]
-            # Extract the review summary as string for comparison
-            review_summary = str(row['REVIEW_SUMMARY']) if row['REVIEW_SUMMARY'] else None
-            print(f"📋 Retrieved last review for comparison from {row['REVIEW_TIMESTAMP']}")
-            return review_summary
+            # Extract the detailed findings and filter by current files
+            findings_json = json.loads(str(row['DETAILED_FINDINGS_JSON'])) if row['DETAILED_FINDINGS_JSON'] else []
+            
+            # CRITICAL FIX: Filter by current files being reviewed
+            current_file_basenames = [os.path.basename(f) if '/' in f or '\\' in f else f for f in current_files_being_reviewed]
+            filtered_findings = [f for f in findings_json if f.get('filename', 'N/A') in current_file_basenames]
+            
+            if not filtered_findings:
+                print("📋 No previous findings for currently reviewed files")
+                return None
+            
+            # Build a summary that includes only relevant findings
+            review_summary_filtered = {
+                "executive_summary": json.loads(str(row['REVIEW_SUMMARY'])).get("executive_summary", "") if row['REVIEW_SUMMARY'] else "",
+                "detailed_findings": filtered_findings,
+                "files_reviewed": current_file_basenames
+            }
+            
+            review_summary_text = json.dumps(review_summary_filtered, indent=2)
+            print(f"📋 Retrieved filtered review for comparison from {row['REVIEW_TIMESTAMP']} ({len(filtered_findings)} relevant findings)")
+            return review_summary_text
         else:
             print("📋 No previous review found for comparison")
             return None
            
     except Exception as e:
-        print(f"❌ Error fetching last review for comparison: {e}")
+        print(f"❌ Error fetching filtered review for comparison: {e}")
         return None
 
 def get_llm_comparison(model: str, prompt_messages: str, session):
