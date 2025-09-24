@@ -1,8 +1,11 @@
 name: Code Review
 on:
-  push:
-  pull_request:
-  workflow_dispatch:
+  pull_request:  # REMOVED push and workflow_dispatch - only run on actual PRs
+  
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   review:
@@ -21,7 +24,7 @@ jobs:
         run: mkdir reviews
       
       - name: Run code review analysis
-        run: python scripts/cortex_python_review.py test reviews ${{ github.event.pull_request.number || github.run_number }} ${{ github.sha }}
+        run: python scripts/cortex_python_review.py test reviews ${{ github.event.pull_request.number }} ${{ github.sha }}
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
@@ -44,5 +47,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
-          GITHUB_RUN_NUMBER: ${{ github.run_number }}
         continue-on-error: true
