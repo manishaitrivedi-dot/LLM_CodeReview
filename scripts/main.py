@@ -166,15 +166,12 @@ def main():
         commit_sha = sys.argv[4]
         directory_mode = True
        
-        # ALWAYS use scripts directory regardless of first argument
         print(f"📁 Command line mode: Scanning directory '{folder_to_scan}'")
         code_files = get_changed_python_files(folder_to_scan)  # Use the actual argument
         if not code_files:
             print(f"❌ No Python/SQL files found in {folder_to_scan} directory using patterns {FILE_PATTERNS}")
             return
         folder_path = folder_to_scan  # Use the actual argument
-           
-        #folder_path = SCRIPTS_DIRECTORY  # Always use scripts directory
            
     else:
         # Fallback for single file mode - use scripts directory with wildcard pattern
