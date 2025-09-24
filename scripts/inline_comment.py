@@ -1,9 +1,7 @@
 import os, json, requests
 
 # Configuration - Dynamic for new repo
-GH_TOKEN = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
-REPO = os.environ.get("GITHUB_REPOSITORY", "your-username/LLM_CodeReview")
-PR_NUMBER = str(os.environ.get("GITHUB_PR_NUMBER") or os.environ.get("GITHUB_RUN_NUMBER", "1"))
+#GH_TOKEN = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
 
 if not GH_TOKEN:
     print("Error: GH_TOKEN or GITHUB_TOKEN environment variable required")
@@ -62,7 +60,14 @@ def post_inline_comments(comments):
 
 if __name__ == "__main__":
     try:
-        print(f"Processing review for PR #{PR_NUMBER} in {REPO}")
+        if len(sys.argv) == 3:
+            REPO = sys.argv[1]
+            GH_TOKEN = sys.argv[0]
+            PR_NUMBER = sys.argv[2]
+            print(f"Processing review for PR #{PR_NUMBER} in {REPO}")
+        
+        #print(f"Processing review for PR #{PR_NUMBER} in {REPO}")
+
         
         # Read the review output
         with open("review_output.json") as f:
