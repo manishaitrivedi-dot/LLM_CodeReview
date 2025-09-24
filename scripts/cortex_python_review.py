@@ -971,6 +971,7 @@ def main():
     print(f"📋 Configuration: {cfg['account']} | User: {cfg['user']} | Database: {cfg.get('database', 'N/A')}")
     
     if len(sys.argv) >= 5:
+        folder_to_scan = sys.argv[1]
         output_folder_path = sys.argv[2]  # Keep output folder from args
         try:
             pull_request_number = int(sys.argv[3]) if sys.argv[3] and sys.argv[3].strip() else None
@@ -981,13 +982,14 @@ def main():
         directory_mode = True
        
         # ALWAYS use scripts directory regardless of first argument
-        print(f"📁 Command line mode: Using {SCRIPTS_DIRECTORY} directory instead of '{sys.argv[1]}'")
-        code_files = get_changed_python_files(SCRIPTS_DIRECTORY)
+        print(f"📁 Command line mode: Scanning directory '{folder_to_scan}'")
+        code_files = get_changed_python_files(folder_to_scan)  # Use the actual argument
         if not code_files:
-            print(f"❌ No Python/SQL files found in {SCRIPTS_DIRECTORY} directory using patterns {FILE_PATTERNS}")
+            print(f"❌ No Python/SQL files found in {folder_to_scan} directory using patterns {FILE_PATTERNS}")
             return
+        folder_path = folder_to_scan  # Use the actual argument
            
-        folder_path = SCRIPTS_DIRECTORY  # Always use scripts directory
+        #folder_path = SCRIPTS_DIRECTORY  # Always use scripts directory
            
     else:
         # Fallback for single file mode - use scripts directory with wildcard pattern
