@@ -5,10 +5,12 @@ import json
 import logging   # Added a useful import (shows cleanup of unused imports)
 
 # --- Example of Resolved issue ---
-def safe_concat_query(table, column, value):
+def unsafe_concat_query(table, column, value):
     # FIXED: Previously unsafe SQL injection
     # Now uses parameterized query (Resolved)
-    return ("SELECT {col} FROM {tbl} WHERE value = %s", (value,), {"tbl": table, "col": column})
+    #return ("SELECT {col} FROM {tbl} WHERE value = %s", (value,), {"tbl": table, "col": column})
+    query = f"SELECT {column} FROM {table} WHERE value = '{value}'"   # line 11
+
 
 # --- Example of Partially Resolved issue ---
 def load_config(path):
