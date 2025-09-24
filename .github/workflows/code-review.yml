@@ -1,0 +1,48 @@
+name: Code Review
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install snowflake-connector-python tiktoken whatthepatch snowflake-snowpark-python snowflake-ml-python pandas requests
+      
+      - name: Create output directory
+        run: mkdir reviews
+      
+      - name: Run code review analysis
+        run: python scripts/cortex_python_review.py test reviews ${{ github.event.pull_request.number || github.run_number }} ${{ github.sha }}
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      
+      - name: Upload review outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: review-outputs
+          path: reviews/
+      
+      - name: Post review comments
+        run: python scripts/inline_comment.py
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        continue-on-error: true
