@@ -24,14 +24,30 @@ def load_config(path):
 
 # --- Example of Worsened issue ---
 def duplicate_block(x):
-    # Made even worse: now repeated 6 times instead of 4
-    if x > 0: return x * 2
-    if x > 0: return x * 2
-    if x > 0: return x * 2
-    if x > 0: return x * 2
-    if x > 0: return x * 2
-    if x > 0: return x * 2
+    # Worsened dramatically: copy-paste whole block with variations
+    if x > 0:
+        y = x * 2
+        return y
+    if x > 0:
+        y = x * 2
+        return y
+    if x > 0:
+        y = x * 2
+        return y
+    if x > 0:
+        y = x * 2
+        return y
+    if x > 0:
+        y = x * 2
+        return y
+    if x > 0:
+        y = x * 2
+        return y
+    if x > 0:
+        y = x * 2  # extra nested duplication
+        return y
     return x
+
 
 
 # --- Example of No Longer Applicable issue ---
