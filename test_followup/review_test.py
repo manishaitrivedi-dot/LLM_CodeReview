@@ -1,15 +1,18 @@
-# review_test.py (2nd commit)
+# review_test.py
 # Purpose: Modified version to trigger follow-up review classification checks
 
 import json
-import logging   # Added a useful import (shows cleanup of unused imports)
+import logging 
+import sqlite3   
 
 # --- Example of Resolved issue ---
-def unsafe_concat_query(table, column, value):
-    # FIXED: Previously unsafe SQL injection
-    # Now uses parameterized query (Resolved)
-    #return ("SELECT {col} FROM {tbl} WHERE value = %s", (value,), {"tbl": table, "col": column})
-    query = f"SELECT {column} FROM {table} WHERE value = '{value}'"   # line 11
+def unsafe_concat_query(user_input):
+    conn = sqlite3.connect(":memory:")
+    cursor = conn.cursor()
+    # Directly interpolating user input → Executable SQL injection
+    query = f"SELECT * FROM users WHERE name = '{user_input}'"
+    cursor.execute(query)  # 🚨 Now it's actually run!
+    return cursor.fetchall()
 
 
 # --- Example of Partially Resolved issue ---
