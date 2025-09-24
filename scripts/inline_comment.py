@@ -1,7 +1,7 @@
 import os, json, requests
 
 # Configuration - Dynamic for new repo
-#GH_TOKEN = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+GH_TOKEN = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
 
 if not GH_TOKEN:
     print("Error: GH_TOKEN or GITHUB_TOKEN environment variable required")
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     try:
         if len(sys.argv) == 3:
             REPO = sys.argv[1]
-            GH_TOKEN = sys.argv[0]
+            #GH_TOKEN = sys.argv[0]
             PR_NUMBER = sys.argv[2]
             print(f"Processing review for PR #{PR_NUMBER} in {REPO}")
         
