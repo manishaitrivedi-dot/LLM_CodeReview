@@ -1,32 +1,3 @@
- Conversation opened. 4 messages. 1 message unread.
-
-Skip to content
-Using Gmail with screen readers
-in:sent 
-1 of 828
-claud
-Inbox
-
-Manisha T
-8:08 PM (37 minutes ago)
-so the 1st one was my original_cortex_review.py file and was working fine with the some other repo and hardcoded pr, but now i am using another repo and pr is b
-
-Manisha T
-8:08 PM (37 minutes ago)
-FILE = 65000 # MINIMAL CHANGE: read from env so it matches your YAML secrets/env cfg = { "account": os.getenv("SNOWFLAKE_ACCOUNT"), "user": os.getenv("SNOWFLAKE
-
-Chinmay
-8:25 PM (20 minutes ago)
-FILE = 65000 # Snowflake session - FIXED: Hybrid approach with fallbacks # --------------------- def get_snowflake_config(): """Get Snowflake configuration with
-
-Chinmay
-Attachments
-8:30 PM (15 minutes ago)
-to me
-
-
-
-On Wed, Sep 24, 2025 at 8:25 PM Chinmay <ctrivedi.100@gmail.com> wrote:
 import os, sys, json, re, uuid, glob
 from pathlib import Path
 from snowflake.snowpark import Session
