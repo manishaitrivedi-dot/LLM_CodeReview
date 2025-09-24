@@ -258,14 +258,16 @@ def main():
         if database_available:
             setup_review_log_table(session, database_available, current_database, current_schema)
 
-        # Get previous review context if available
+        # FIXED: Get previous review context if available - Pass current files
         previous_review_context = None
         if pull_request_number and pull_request_number != 0 and database_available:
-            previous_review_context = get_previous_review(session, database_available, current_database, current_schema, pull_request_number)
+            # CRITICAL FIX: Pass the list of current files being reviewed
+            current_files_being_reviewed = processed_files  # This contains the current file basenames
+            previous_review_context = get_previous_review(session, database_available, current_database, current_schema, pull_request_number, current_files_being_reviewed)
             if previous_review_context:
-                print("  📋 This is a subsequent commit review with previous context")
+                print("  📋 This is a subsequent commit review with previous context (filtered by current files)")
             else:
-                print("  📋 This is the initial commit review")
+                print("  📋 This is the initial review for these files (no previous relevant findings)")
         elif not database_available:
             print("  ⚠️ Database not available - cannot retrieve previous reviews")
 
@@ -407,17 +409,17 @@ def main():
             json.dump(review_output_data, f, indent=2, ensure_ascii=False)
         print("  ✅ review_output.json saved for inline_comment.py compatibility")
 
-        # ENHANCED: LLM-based comparison with previous review
+        # FIXED: LLM-based comparison with previous review - Filter by current files
         comparison_result = None
         if pull_request_number and pull_request_number != 0 and database_available:
             print("\n🔄 STAGE 3: LLM Comparison with Previous Review...")
             print("=" * 60)
            
-            # Fetch the previous review for comparison
-            previous_review_summary = fetch_last_review_for_comparison(session, database_available, current_database, current_schema, pull_request_number)
+            # CRITICAL FIX: Pass current files to filter previous review
+            previous_review_summary = fetch_last_review_for_comparison(session, database_available, current_database, current_schema, pull_request_number, processed_files)
            
             if previous_review_summary:
-                print("📋 Previous review found. Performing LLM comparison...")
+                print("📋 Previous review found (filtered by current files). Performing LLM comparison...")
                
                 # Format the comparison prompt using the template from second code
                 formatted_prompt = PROMPT_TO_COMPARE_REVIEWS.replace(
@@ -450,7 +452,7 @@ def main():
                         # Update the consolidated JSON with the comparison results
                         consolidated_json["previous_issues_resolved"] = previous_issues_resolved
                        
-                        print(f"📈 Updated consolidated JSON with {len(previous_issues_resolved)} previous issue statuses")
+                        print(f"📈 Updated consolidated JSON with {len(previous_issues_resolved)} previous issue statuses (current files only)")
                        
                         # Regenerate executive summary with comparison data
                         executive_summary = format_executive_pr_display(consolidated_json, processed_files, current_database or "N/A", current_schema or "N/A")
@@ -473,7 +475,7 @@ def main():
                 else:
                     print("⚠️ LLM comparison failed or returned no results")
             else:
-                print("📋 No previous review found for comparison - this appears to be the initial review")
+                print("📋 No previous review found for comparison - this appears to be the initial review for these files")
 
         # Store current review for future comparisons - ENHANCED with comparison_result and APPEND mode
         if pull_request_number and pull_request_number != 0 and database_available:
