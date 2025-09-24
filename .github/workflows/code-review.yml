@@ -7,24 +7,17 @@ permissions:
   contents: read
   issues: write
   pull-requests: write
-  repository-projects: read
 
 jobs:
   review:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.event.pull_request.number != null
+    if: github.event_name == 'pull_request'
     
     steps:
       - uses: actions/checkout@v4
         with:
-          # This checks out the merge commit (PR branch + main)
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0  # Fetch full history
-      
-      # Optional: Also fetch the base branch to have access to both
-      - name: Fetch base branch
-        run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }}:${{ github.event.pull_request.base.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
       
       - uses: actions/setup-python@v4
         with:
@@ -36,17 +29,17 @@ jobs:
       - name: Create output directory
         run: mkdir -p reviews
       
-      - name: Debug file structure
+      - name: Debug environment
         run: |
-          echo "Current directory structure:"
-          find . -name "*.py" -o -name "*.sql" | head -20
-          echo "Test directory contents:"
+          echo "Repository: ${{ github.repository }}"
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
+          echo "Files in test directory:"
           ls -la test/ || echo "No test directory found"
-          echo "Scripts directory contents:"
-          ls -la scripts/ || echo "No scripts directory found"
+          find . -name "*.py" -o -name "*.sql" | grep -E "(test/|scripts/)" || echo "No Python/SQL files found"
       
       - name: Run code review analysis
-        run: python scripts/cortex_python_review.py test reviews ${{ github.event.pull_request.number }} ${{ github.sha }}
+        run: python scripts/cortex_python_review.py test reviews ${{ github.event.pull_request.number }} ${{ github.event.pull_request.head.sha }}
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
@@ -69,6 +62,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
-          GITHUB_SHA: ${{ github.sha }}
-          GITHUB_API_URL: ${{ github.api_url }}
         continue-on-error: true
