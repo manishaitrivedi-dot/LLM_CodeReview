@@ -1,14 +1,26 @@
 name: Code Review
 on:
-  push:
   pull_request:
-  workflow_dispatch:
+    types: [opened, synchronize, reopened]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+  
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
 jobs:
   review:
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
       
       - uses: actions/setup-python@v4
         with:
@@ -18,10 +30,19 @@ jobs:
         run: pip install snowflake-connector-python tiktoken whatthepatch snowflake-snowpark-python snowflake-ml-python pandas requests
       
       - name: Create output directory
-        run: mkdir reviews
+        run: mkdir -p reviews
+      
+      - name: Debug environment
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
+          echo "Files in test directory:"
+          ls -la test/ || echo "No test directory found"
+          find . -name "*.py" -o -name "*.sql" | grep -E "(test/|scripts/)" || echo "No Python/SQL files found"
       
       - name: Run code review analysis
-        run: python scripts/cortex_python_review.py test reviews ${{ github.event.pull_request.number || github.run_number }} ${{ github.sha }}
+        run: python scripts/main.py test reviews ${{ github.event.pull_request.number }} ${{ github.event.pull_request.head.sha }}
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
@@ -41,8 +62,7 @@ jobs:
       - name: Post review comments
         run: python scripts/inline_comment.py
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
-          GITHUB_RUN_NUMBER: ${{ github.run_number }}
         continue-on-error: true
