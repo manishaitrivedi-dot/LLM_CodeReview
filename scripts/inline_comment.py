@@ -73,8 +73,6 @@ if __name__ == "__main__":
         # Post overall PR review comment
         review_body = f"""## Automated LLM Code Review
 
-# **File Reviewed:** {review_data['file']}
-# **Critical Issues Found:** {len(review_data['criticals'])}
 
 ### Full Review:
 {review_data['full_review']}
