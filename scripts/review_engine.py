@@ -41,9 +41,35 @@ def get_changed_python_files(folder_path=None):
    
     return all_files
 
+# def build_prompt_for_individual_review(code_text: str, filename: str = "code_file") -> str:
+#     prompt = PROMPT_TEMPLATE_INDIVIDUAL.replace("{PY_CONTENT}", code_text)
+#     prompt = prompt.replace("{filename}", filename)
+#     return prompt
+
 def build_prompt_for_individual_review(code_text: str, filename: str = "code_file") -> str:
-    prompt = PROMPT_TEMPLATE_INDIVIDUAL.replace("{PY_CONTENT}", code_text)
-    prompt = prompt.replace("{filename}", filename)
+    """
+    Build appropriate prompt based on file type (Python vs SQL)
+    """
+    # Determine file type
+    is_sql_file = filename.lower().endswith('.sql')
+    is_python_file = filename.lower().endswith('.py')
+    
+    if is_sql_file:
+        # Use SQL-specific prompt
+        prompt = PROMPT_TEMPLATE_SQL_INDIVIDUAL.replace("{SQL_CONTENT}", code_text)
+        prompt = prompt.replace("{filename}", filename)
+        print(f"  🗄️ Using SQL-specific review prompt for {filename}")
+    elif is_python_file:
+        # Use Python-specific prompt
+        prompt = PROMPT_TEMPLATE_PYTHON_INDIVIDUAL.replace("{PY_CONTENT}", code_text)
+        prompt = prompt.replace("{filename}", filename)
+        print(f"  🐍 Using Python-specific review prompt for {filename}")
+    else:
+        # Fallback to Python prompt for other files
+        prompt = PROMPT_TEMPLATE_PYTHON_INDIVIDUAL.replace("{PY_CONTENT}", code_text)
+        prompt = prompt.replace("{filename}", filename)
+        print(f"  📄 Using Python review prompt as fallback for {filename}")
+    
     return prompt
 
 def build_prompt_for_consolidated_summary(all_reviews_content: str, previous_context: str = None, pr_number: int = None) -> str:
