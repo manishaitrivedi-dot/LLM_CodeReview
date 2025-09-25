@@ -81,6 +81,30 @@ def post_pr_comment(body: str):
         print(f"Failed to post PR comment: {response.status_code}")
         print(f"Response: {response.text}")
 
+def find_matching_file(filename, changed_files):
+    """Find the actual file path in changed_files that matches the given filename"""
+    # Direct match first
+    if filename in changed_files:
+        return filename
+    
+    # Try to find by basename (filename without directory)
+    import os
+    basename = os.path.basename(filename)
+    
+    for changed_file in changed_files.keys():
+        if os.path.basename(changed_file) == basename:
+            print(f"Matched {filename} -> {changed_file}")
+            return changed_file
+    
+    # Try partial matching (case insensitive)
+    filename_lower = filename.lower()
+    for changed_file in changed_files.keys():
+        if filename_lower in changed_file.lower() or os.path.basename(changed_file).lower() == filename_lower:
+            print(f"Partial matched {filename} -> {changed_file}")
+            return changed_file
+    
+    return None
+
 def post_inline_comments(comments, changed_files):
     """Post inline comments for critical issues only"""
     # Get latest commit SHA for this PR
@@ -103,64 +127,70 @@ def post_inline_comments(comments, changed_files):
     posted_count = 0
     skipped_count = 0
     
+    print(f"Available changed files: {list(changed_files.keys())}")
+    
     for c in comments:
-        file_path = c["path"]
+        original_path = c["path"]
         line_num = c["line"]
         
-        # Check if file exists in PR changes
-        if file_path not in changed_files:
-            print(f"Skipping comment for {file_path}: file not in PR changes")
+        # Find the actual file path in the PR
+        actual_file_path = find_matching_file(original_path, changed_files)
+        
+        if not actual_file_path:
+            print(f"Skipping comment for {original_path}: no matching file found in PR changes")
             skipped_count += 1
             continue
         
+        print(f"Processing comment for {actual_file_path} (originally {original_path}) at line {line_num}")
+        
         # Check if file was deleted
-        if changed_files[file_path]['status'] == 'removed':
-            print(f"Skipping comment for {file_path}: file was deleted")
+        if changed_files[actual_file_path]['status'] == 'removed':
+            print(f"Skipping comment for {actual_file_path}: file was deleted")
             skipped_count += 1
             continue
         
         # For new files, we can comment on any line
         # For modified files, we should only comment on changed lines
-        if changed_files[file_path]['status'] == 'added':
+        if changed_files[actual_file_path]['status'] == 'added':
             # New file - can comment on any line up to the file length
             valid_lines = set(range(1, 1000))  # Reasonable upper bound
         else:
             # Modified file - get valid lines from patch
-            valid_lines = parse_patch_lines(changed_files[file_path]['patch'])
+            valid_lines = parse_patch_lines(changed_files[actual_file_path]['patch'])
         
         # If we couldn't determine valid lines or line is not valid, try anyway
         # but use line 1 as fallback for added files
-        if not valid_lines and changed_files[file_path]['status'] == 'added':
+        if not valid_lines and changed_files[actual_file_path]['status'] == 'added':
             line_num = 1
         elif valid_lines and line_num not in valid_lines:
             # Try to find the closest valid line
             closest_line = min(valid_lines, key=lambda x: abs(x - line_num)) if valid_lines else 1
-            print(f"Line {line_num} not in diff for {file_path}, using closest line {closest_line}")
+            print(f"Line {line_num} not in diff for {actual_file_path}, using closest line {closest_line}")
             line_num = closest_line
         
         data = {
             "body": c["body"],
             "commit_id": latest_sha,
-            "path": file_path,
+            "path": actual_file_path,  # Use the actual file path from PR
             "side": "RIGHT",
             "line": line_num
         }
         
         response = requests.post(comment_url, headers=headers, json=data)
         if response.status_code == 201:
-            print(f"Posted inline comment on {file_path}:{line_num}")
+            print(f"Posted inline comment on {actual_file_path}:{line_num}")
             posted_count += 1
         else:
-            print(f"Failed to post inline comment on {file_path}:{line_num}: {response.status_code}")
+            print(f"Failed to post inline comment on {actual_file_path}:{line_num}: {response.status_code}")
             print(f"Response: {response.text}")
             
             # Try alternative approach: use position instead of line for diffs
             if response.status_code == 422:
-                print(f"Retrying with line 1 for {file_path}")
+                print(f"Retrying with line 1 for {actual_file_path}")
                 data["line"] = 1
                 retry_response = requests.post(comment_url, headers=headers, json=data)
                 if retry_response.status_code == 201:
-                    print(f"Posted inline comment on {file_path}:1 (retry)")
+                    print(f"Posted inline comment on {actual_file_path}:1 (retry)")
                     posted_count += 1
                 else:
                     print(f"Retry also failed: {retry_response.status_code}")
@@ -189,6 +219,8 @@ if __name__ == "__main__":
         # Post overall PR review comment
         review_body = f"""## Automated LLM Code Review
 
+**File Reviewed:** {review_data['file']}
+**Critical Issues Found:** {len(review_data['criticals'])}
 
 ### Full Review:
 {review_data['full_review']}
