@@ -12,7 +12,8 @@ CREATE TABLE users (
 INSERT INTO users (user_id, username, password)
 VALUES
     (1, 'admin', 'admin123'),   -- ❌ Critical: Weak hardcoded password
-    (2, 'test', 'password');
+    (2, 'test', 'password'),
+    (1, 'test11', 'password@3133');
 
 -- Vulnerable query (SQL injection risk: directly concatenating user input)
 -- ❌ Critical: This should use parameterized queries instead
