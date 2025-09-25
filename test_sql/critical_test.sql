@@ -4,7 +4,7 @@
 CREATE TABLE users (
     --test for inline comment 1
     user_id INT PRIMARY KEY,
-    --test for inline comment 2 
+    --test for inline comment 2
     username VARCHAR(50) UNIQUE NOT NULL,
     password VARCHAR(100),   -- ❌ Critical: Plaintext password storage
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
