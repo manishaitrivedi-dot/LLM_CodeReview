@@ -218,6 +218,7 @@ def main():
                     chunk_name = f"{filename}_chunk_{i+1}" if len(chunks) > 1 else filename
                     print(f"  Processing chunk: {chunk_name}")
                    
+                    # UPDATED: Use the new file-type-aware prompt builder
                     individual_prompt = build_prompt_for_individual_review(chunk, chunk_name)
                     review_text = review_with_cortex(MODEL, individual_prompt, session)
                     chunk_reviews.append(review_text)
