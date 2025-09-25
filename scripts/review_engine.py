@@ -67,7 +67,7 @@ def review_with_cortex(model, prompt_text: str, session) -> str:
         print(f"Error calling Cortex complete for model '{model}': {e}", file=sys.stderr)
         return f"ERROR: Could not get response from Cortex. Reason: {e}"
 
-def chunk_large_file(code_text: str, max_chunk_size: int = 50000) -> list:
+def chunk_large_file(code_text: str, max_chunk_size: int = 95000) -> list:
     if len(code_text) <= max_chunk_size:
         return [code_text]
    
