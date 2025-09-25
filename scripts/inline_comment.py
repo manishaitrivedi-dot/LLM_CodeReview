@@ -73,20 +73,19 @@ if __name__ == "__main__":
         # Post overall PR review comment
         review_body = f"""## Automated LLM Code Review
 
-**File Reviewed:** {review_data['file']}
-**Critical Issues Found:** {len(review_data['criticals'])}
+# **File Reviewed:** {review_data['file']}
+# **Critical Issues Found:** {len(review_data['criticals'])}
 
 ### Full Review:
 {review_data['full_review']}
 
-### Critical Issues Summary:
 """
         
-        for critical in review_data['criticals']:
-            # FIX: Use 'finding' instead of 'issue' since that's what cortex_python_review.py creates
-            finding_text = critical.get('finding', 'No description available')
-            line_num = critical.get('line', critical.get('line_number', 'N/A'))
-            review_body += f"- **Line {line_num}:** {finding_text}\n"
+        # for critical in review_data['criticals']:
+        #     # FIX: Use 'finding' instead of 'issue' since that's what cortex_python_review.py creates
+        #     finding_text = critical.get('finding', 'No description available')
+        #     line_num = critical.get('line', critical.get('line_number', 'N/A'))
+        #     review_body += f"- **Line {line_num}:** {finding_text}\n"
         
         review_body += "\n*Critical issues are also posted as inline comments on specific lines.*"
         
