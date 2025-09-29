@@ -9,7 +9,7 @@ MAX_CHARS_FOR_FINAL_SUMMARY_FILE = 65000
 MAX_TOKENS_FOR_SUMMARY_INPUT = 100000
 
 # Dynamic file pattern - processes all Python AND SQL files in scripts directory
-SCRIPTS_DIRECTORY = "3_big_py_files"  # Base directory to scan
+SCRIPTS_DIRECTORY = "1bigfile+1smallerfiles"  # Base directory to scan
 FILE_PATTERNS = ["*.py", "*.sql"]  # CHANGED: Added SQL files
 
 # ---------------------
