@@ -86,7 +86,7 @@ def chunk_large_file(code_text: str, max_chunk_size: int = 95000) -> list:
 
 def extract_critical_findings_from_review(review_text: str, filename: str) -> dict:
     """
-    Extract only critical/high severity findings and key summary from review text.
+    Extract only critical/high severity findings WITH LINE NUMBERS and key summary from review text.
     This preserves important information while drastically reducing size.
     """
     result = {
@@ -94,13 +94,14 @@ def extract_critical_findings_from_review(review_text: str, filename: str) -> di
         "summary": "",
         "critical_findings": [],
         "high_findings": [],
+        "medium_findings": [],
         "stats": {"critical": 0, "high": 0, "medium": 0, "low": 0}
     }
     
     # Extract executive summary (first 500 chars)
     lines = review_text.split('\n')
     summary_lines = []
-    for line in lines[:20]:  # Check first 20 lines for summary
+    for line in lines[:20]:
         if line.strip() and not line.startswith('#') and not line.startswith('**'):
             summary_lines.append(line.strip())
             if len(' '.join(summary_lines)) > 500:
@@ -118,23 +119,66 @@ def extract_critical_findings_from_review(review_text: str, filename: str) -> di
     result["stats"]["medium"] = len(medium_matches)
     result["stats"]["low"] = len(low_matches)
     
-    # Extract critical findings with context
-    critical_pattern = r'\*\*Severity:\*\*\s*Critical.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*|$)'
+    # ENHANCED: Extract critical findings WITH line numbers
+    # Pattern: **Line:** 123 ... **Severity:** Critical ... **Finding:** text
+    critical_pattern = r'\*\*Line:\*\*\s*(\d+).*?\*\*Severity:\*\*\s*Critical.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*Line:|\n\*\*File:|$)'
     for match in re.finditer(critical_pattern, review_text, re.IGNORECASE | re.DOTALL):
-        finding_text = match.group(1).strip()[:300]  # First 300 chars
-        result["critical_findings"].append(finding_text)
+        line_num = match.group(1)
+        finding_text = match.group(2).strip()[:300]
+        result["critical_findings"].append({
+            "line": line_num,
+            "finding": finding_text
+        })
     
-    # Extract high findings with context
-    high_pattern = r'\*\*Severity:\*\*\s*High.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*|$)'
+    # If no line numbers found, try alternative pattern without line numbers
+    if not result["critical_findings"]:
+        critical_pattern_alt = r'\*\*Severity:\*\*\s*Critical.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*Severity:|\n\*\*File:|$)'
+        for match in re.finditer(critical_pattern_alt, review_text, re.IGNORECASE | re.DOTALL):
+            finding_text = match.group(1).strip()[:300]
+            result["critical_findings"].append({
+                "line": "N/A",
+                "finding": finding_text
+            })
+    
+    # ENHANCED: Extract high findings WITH line numbers
+    high_pattern = r'\*\*Line:\*\*\s*(\d+).*?\*\*Severity:\*\*\s*High.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*Line:|\n\*\*File:|$)'
     for match in re.finditer(high_pattern, review_text, re.IGNORECASE | re.DOTALL):
-        finding_text = match.group(1).strip()[:200]  # First 200 chars
-        result["high_findings"].append(finding_text)
+        line_num = match.group(1)
+        finding_text = match.group(2).strip()[:250]
+        result["high_findings"].append({
+            "line": line_num,
+            "finding": finding_text
+        })
+    
+    # If no line numbers found, try alternative pattern
+    if not result["high_findings"]:
+        high_pattern_alt = r'\*\*Severity:\*\*\s*High.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*Severity:|\n\*\*File:|$)'
+        for match in re.finditer(high_pattern_alt, review_text, re.IGNORECASE | re.DOTALL):
+            finding_text = match.group(1).strip()[:250]
+            result["high_findings"].append({
+                "line": "N/A",
+                "finding": finding_text
+            })
+    
+    # ENHANCED: Extract some medium findings WITH line numbers (limit to top 5)
+    medium_pattern = r'\*\*Line:\*\*\s*(\d+).*?\*\*Severity:\*\*\s*Medium.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*Line:|\n\*\*File:|$)'
+    medium_count = 0
+    for match in re.finditer(medium_pattern, review_text, re.IGNORECASE | re.DOTALL):
+        if medium_count >= 5:
+            break
+        line_num = match.group(1)
+        finding_text = match.group(2).strip()[:150]
+        result["medium_findings"].append({
+            "line": line_num,
+            "finding": finding_text
+        })
+        medium_count += 1
     
     return result
 
 def create_condensed_reviews(all_reviews: list) -> str:
     """
-    Create a condensed version of reviews that preserves critical information
+    Create a condensed version of reviews that preserves critical information INCLUDING LINE NUMBERS
     but fits within token limits. This is MUCH better than blind truncation.
     """
     condensed = []
@@ -145,16 +189,17 @@ def create_condensed_reviews(all_reviews: list) -> str:
         review_feedback = review.get('review_feedback', '')
         total_original_size += len(review_feedback)
         
-        # Extract critical info
+        # Extract critical info with line numbers
         extracted = extract_critical_findings_from_review(review_feedback, filename)
         
-        # Build condensed review
+        # Build condensed review with line numbers preserved
         condensed_review = {
             "filename": filename,
             "summary": extracted["summary"],
             "severity_stats": extracted["stats"],
             "critical_issues": extracted["critical_findings"],
-            "high_issues": extracted["high_findings"]
+            "high_issues": extracted["high_findings"],
+            "medium_issues": extracted["medium_findings"]
         }
         
         condensed.append(condensed_review)
