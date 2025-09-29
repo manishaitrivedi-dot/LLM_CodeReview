@@ -5,71 +5,42 @@ from pathlib import Path
 from config_and_prompts import *
 
 def get_changed_python_files(folder_path=None):
-    """
-    Dynamically get all Python AND SQL files from the specified folder or scripts directory.
-    Uses wildcard pattern matching for flexibility.
-    """
-    # If no folder specified, use the scripts directory
+    """Dynamically get all Python AND SQL files from the specified folder or scripts directory."""
     if not folder_path:
         folder_path = SCRIPTS_DIRECTORY
-       
     if not os.path.exists(folder_path):
-        print(f"❌ Directory {folder_path} not found")
+        print(f"Directory {folder_path} not found")
         return []
-   
     all_files = []
-   
-    # Process both Python and SQL files
     for pattern in FILE_PATTERNS:
-        # Use glob pattern to find files
         pattern_path = os.path.join(folder_path, pattern)
         found_files = glob.glob(pattern_path)
-       
-        # Also check subdirectories recursively
         recursive_pattern = os.path.join(folder_path, "**", pattern)
         found_files.extend(glob.glob(recursive_pattern, recursive=True))
-       
         all_files.extend(found_files)
-   
-    # Remove duplicates and sort
     all_files = sorted(list(set(all_files)))
-   
-    print(f"📁 Found {len(all_files)} code files in {folder_path} using patterns {FILE_PATTERNS}:")
+    print(f"Found {len(all_files)} code files in {folder_path} using patterns {FILE_PATTERNS}:")
     for file in all_files:
         file_type = "SQL" if file.lower().endswith('.sql') else "Python"
         print(f"  - {file} ({file_type})")
-   
     return all_files
 
-# def build_prompt_for_individual_review(code_text: str, filename: str = "code_file") -> str:
-#     prompt = PROMPT_TEMPLATE_INDIVIDUAL.replace("{PY_CONTENT}", code_text)
-#     prompt = prompt.replace("{filename}", filename)
-#     return prompt
-
 def build_prompt_for_individual_review(code_text: str, filename: str = "code_file") -> str:
-    """
-    Build appropriate prompt based on file type (Python vs SQL)
-    """
-    # Determine file type
+    """Build appropriate prompt based on file type (Python vs SQL)"""
     is_sql_file = filename.lower().endswith('.sql')
     is_python_file = filename.lower().endswith('.py')
-    
     if is_sql_file:
-        # Use SQL-specific prompt
         prompt = PROMPT_TEMPLATE_SQL_INDIVIDUAL.replace("{SQL_CONTENT}", code_text)
         prompt = prompt.replace("{filename}", filename)
-        print(f"  🗄️ Using SQL-specific review prompt for {filename}")
+        print(f"  Using SQL-specific review prompt for {filename}")
     elif is_python_file:
-        # Use Python-specific prompt
         prompt = PROMPT_TEMPLATE_PYTHON_INDIVIDUAL.replace("{PY_CONTENT}", code_text)
         prompt = prompt.replace("{filename}", filename)
-        print(f"  🐍 Using Python-specific review prompt for {filename}")
+        print(f"  Using Python-specific review prompt for {filename}")
     else:
-        # Fallback to Python prompt for other files
         prompt = PROMPT_TEMPLATE_PYTHON_INDIVIDUAL.replace("{PY_CONTENT}", code_text)
         prompt = prompt.replace("{filename}", filename)
-        print(f"  📄 Using Python review prompt as fallback for {filename}")
-    
+        print(f"  Using Python review prompt as fallback for {filename}")
     return prompt
 
 def build_prompt_for_consolidated_summary(all_reviews_content: str, previous_context: str = None, pr_number: int = None) -> str:
@@ -96,12 +67,10 @@ def review_with_cortex(model, prompt_text: str, session) -> str:
 def chunk_large_file(code_text: str, max_chunk_size: int = 95000) -> list:
     if len(code_text) <= max_chunk_size:
         return [code_text]
-   
     lines = code_text.split('\n')
     chunks = []
     current_chunk = []
     current_size = 0
-   
     for line in lines:
         line_size = len(line) + 1
         if current_size + line_size > max_chunk_size and current_chunk:
@@ -111,46 +80,108 @@ def chunk_large_file(code_text: str, max_chunk_size: int = 95000) -> list:
         else:
             current_chunk.append(line)
             current_size += line_size
-   
     if current_chunk:
         chunks.append('\n'.join(current_chunk))
-   
     return chunks
 
+def extract_critical_findings_from_review(review_text: str, filename: str) -> dict:
+    """
+    Extract only critical/high severity findings and key summary from review text.
+    This preserves important information while drastically reducing size.
+    """
+    result = {
+        "filename": filename,
+        "summary": "",
+        "critical_findings": [],
+        "high_findings": [],
+        "stats": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+    }
+    
+    # Extract executive summary (first 500 chars)
+    lines = review_text.split('\n')
+    summary_lines = []
+    for line in lines[:20]:  # Check first 20 lines for summary
+        if line.strip() and not line.startswith('#') and not line.startswith('**'):
+            summary_lines.append(line.strip())
+            if len(' '.join(summary_lines)) > 500:
+                break
+    result["summary"] = ' '.join(summary_lines)[:500]
+    
+    # Extract severity counts
+    critical_matches = re.findall(r'\*\*Severity:\*\*\s*Critical', review_text, re.IGNORECASE)
+    high_matches = re.findall(r'\*\*Severity:\*\*\s*High', review_text, re.IGNORECASE)
+    medium_matches = re.findall(r'\*\*Severity:\*\*\s*Medium', review_text, re.IGNORECASE)
+    low_matches = re.findall(r'\*\*Severity:\*\*\s*Low', review_text, re.IGNORECASE)
+    
+    result["stats"]["critical"] = len(critical_matches)
+    result["stats"]["high"] = len(high_matches)
+    result["stats"]["medium"] = len(medium_matches)
+    result["stats"]["low"] = len(low_matches)
+    
+    # Extract critical findings with context
+    critical_pattern = r'\*\*Severity:\*\*\s*Critical.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*|$)'
+    for match in re.finditer(critical_pattern, review_text, re.IGNORECASE | re.DOTALL):
+        finding_text = match.group(1).strip()[:300]  # First 300 chars
+        result["critical_findings"].append(finding_text)
+    
+    # Extract high findings with context
+    high_pattern = r'\*\*Severity:\*\*\s*High.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*|$)'
+    for match in re.finditer(high_pattern, review_text, re.IGNORECASE | re.DOTALL):
+        finding_text = match.group(1).strip()[:200]  # First 200 chars
+        result["high_findings"].append(finding_text)
+    
+    return result
+
+def create_condensed_reviews(all_reviews: list) -> str:
+    """
+    Create a condensed version of reviews that preserves critical information
+    but fits within token limits. This is MUCH better than blind truncation.
+    """
+    condensed = []
+    total_original_size = 0
+    
+    for review in all_reviews:
+        filename = review.get('filename', 'unknown')
+        review_feedback = review.get('review_feedback', '')
+        total_original_size += len(review_feedback)
+        
+        # Extract critical info
+        extracted = extract_critical_findings_from_review(review_feedback, filename)
+        
+        # Build condensed review
+        condensed_review = {
+            "filename": filename,
+            "summary": extracted["summary"],
+            "severity_stats": extracted["stats"],
+            "critical_issues": extracted["critical_findings"],
+            "high_issues": extracted["high_findings"]
+        }
+        
+        condensed.append(condensed_review)
+    
+    result = json.dumps(condensed, indent=2)
+    
+    print(f"  Condensed reviews: {total_original_size} -> {len(result)} chars ({(len(result)/total_original_size)*100:.1f}% of original)")
+    
+    return result
+
 def calculate_executive_quality_score(findings: list, total_lines_of_code: int) -> int:
-    """
-    Executive-level rule-based quality scoring (0-100).
-    MUCH MORE BALANCED - Fixed overly harsh scoring.
-   
-    Scoring Logic (REALISTIC):
-    - Start with base score of 100
-    - Reasonable deductions that won't hit zero easily
-    - Focus on actionable scoring for executives
-    """
+    """Executive-level rule-based quality scoring (0-100)."""
     if not findings or len(findings) == 0:
         return 100
-   
     base_score = 100
     total_deductions = 0
-   
-    # MUCH MORE BALANCED severity weightings
     severity_weights = {
-        "Critical": 12,    # Each critical issue deducts 12 points (but there should be very few)
-        "High": 4,         # Each high issue deducts 4 points
-        "Medium": 1.5,     # Each medium issue deducts 1.5 points
-        "Low": 0.3         # Each low issue deducts 0.3 points
+        "Critical": 12,
+        "High": 4,
+        "Medium": 1.5,
+        "Low": 0.3
     }
-   
-    # Count issues by severity - STRICT PRECISION (NO CONVERSION)
     severity_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
     total_affected_lines = 0
-   
-    print(f"  📊 Scoring {len(findings)} findings...")
-   
+    print(f"  Scoring {len(findings)} findings...")
     for finding in findings:
-        severity = str(finding.get("severity", "")).strip()  # Keep original case
-       
-        # STRICT MATCHING - NO CONVERSION TO MEDIUM
+        severity = str(finding.get("severity", "")).strip()
         if severity == "Critical":
             severity_counts["Critical"] += 1
         elif severity == "High":
@@ -160,80 +191,54 @@ def calculate_executive_quality_score(findings: list, total_lines_of_code: int) 
         elif severity == "Low":
             severity_counts["Low"] += 1
         else:
-            # LOG UNRECOGNIZED SEVERITY BUT DON'T COUNT IT
-            print(f"    ⚠️ UNRECOGNIZED SEVERITY: '{severity}' in finding: {finding.get('finding', 'Unknown')[:50]}... - SKIPPING")
-            continue  # Skip this finding entirely instead of converting
-           
+            print(f"    UNRECOGNIZED SEVERITY: '{severity}' in finding: {finding.get('finding', 'Unknown')[:50]}... - SKIPPING")
+            continue
         print(f"    - {severity}: {finding.get('finding', 'No description')[:50]}...")
-       
-        # Count affected lines (treat N/A as 1 line)
         line_num = finding.get("line_number", "N/A")
         total_affected_lines += 1
-   
-    print(f"  📈 Severity breakdown: Critical={severity_counts['Critical']}, High={severity_counts['High']}, Medium={severity_counts['Medium']}, Low={severity_counts['Low']}")
-   
-    # Calculate REALISTIC deductions from severity
+    print(f"  Severity breakdown: Critical={severity_counts['Critical']}, High={severity_counts['High']}, Medium={severity_counts['Medium']}, Low={severity_counts['Low']}")
     for severity, count in severity_counts.items():
         if count > 0:
             weight = severity_weights[severity]
-           
-            # MUCH MORE BALANCED progressive penalty
             if severity == "Critical":
-                # Critical: Should be very rare, but high impact
                 if count <= 2:
                     deduction = weight * count
                 else:
                     deduction = weight * 2 + (count - 2) * (weight + 3)
-                # Cap critical deductions at 30 points max
                 deduction = min(30, deduction)
             elif severity == "High":
-                # High: Linear scaling with small bonus after 10 issues
                 if count <= 10:
                     deduction = weight * count
                 else:
                     deduction = weight * 10 + (count - 10) * (weight + 1)
-                # Cap high severity deductions at 25 points max
                 deduction = min(25, deduction)
             else:
-                # Medium/Low: Pure linear scaling with caps
                 deduction = weight * count
-                # Reasonable caps
                 if severity == "Medium":
                     deduction = min(20, deduction)
                 else:
                     deduction = min(10, deduction)
-               
             total_deductions += deduction
             print(f"    {severity}: {count} issues = -{deduction:.1f} points (capped)")
-   
-    # MUCH REDUCED penalties
     if total_lines_of_code > 0:
         affected_ratio = total_affected_lines / total_lines_of_code
-        if affected_ratio > 0.4:  # Only penalize if more than 40% affected
-            coverage_penalty = min(5, int(affected_ratio * 20))  # Max 5 point penalty
+        if affected_ratio > 0.4:
+            coverage_penalty = min(5, int(affected_ratio * 20))
             total_deductions += coverage_penalty
             print(f"    Coverage penalty: -{coverage_penalty} points ({affected_ratio:.1%} affected)")
-   
-    # REALISTIC critical threshold penalties (should rarely trigger)
-    if severity_counts["Critical"] >= 3:  # Very high threshold
+    if severity_counts["Critical"] >= 3:
         total_deductions += 10
         print(f"    Executive threshold penalty: -10 points (3+ critical issues)")
-   
-    if severity_counts["Critical"] + severity_counts["High"] >= 20:  # High threshold
+    if severity_counts["Critical"] + severity_counts["High"] >= 20:
         total_deductions += 5
         print(f"    Production readiness penalty: -5 points (20+ critical/high issues)")
-   
-    # Calculate final score
     final_score = max(0, base_score - int(total_deductions))
-   
-    print(f"  🎯 Final calculation: {base_score} - {int(total_deductions)} = {final_score}")
-   
-    # ADJUSTED executive score bands for more realistic scoring
+    print(f"  Final calculation: {base_score} - {int(total_deductions)} = {final_score}")
     if final_score >= 85:
-        return min(100, final_score)  # Excellent
+        return min(100, final_score)
     elif final_score >= 70:
-        return final_score  # Good
+        return final_score
     elif final_score >= 50:
-        return final_score  # Fair - needs attention
+        return final_score
     else:
-        return max(30, final_score)  # Poor - but never below 30 for functional code
+        return max(30, final_score)
