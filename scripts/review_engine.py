@@ -84,10 +84,70 @@ def chunk_large_file(code_text: str, max_chunk_size: int = 95000) -> list:
         chunks.append('\n'.join(current_chunk))
     return chunks
 
+def extract_findings_with_line_numbers(review_text: str, severity: str) -> list:
+    """
+    Extract findings of a specific severity with line numbers using multiple patterns.
+    Returns list of dicts with 'line' and 'finding' keys.
+    """
+    findings = []
+    
+    # Pattern 1: Standard format with Line, Severity, Finding
+    pattern1 = rf'-\s*\*\*Severity:\*\*\s*{severity}.*?\*\*Line:\*\*\s*(\d+).*?\*\*Finding:\*\*\s*(.*?)(?=\n-\s*\*\*Severity:|\n\*\*File:|\n###|\Z)'
+    for match in re.finditer(pattern1, review_text, re.IGNORECASE | re.DOTALL):
+        findings.append({
+            "line": match.group(1),
+            "finding": match.group(2).strip()[:300]
+        })
+    
+    # Pattern 2: Line comes before Severity
+    pattern2 = rf'-\s*\*\*Line:\*\*\s*(\d+).*?\*\*Severity:\*\*\s*{severity}.*?\*\*Finding:\*\*\s*(.*?)(?=\n-\s*\*\*|\n\*\*File:|\n###|\Z)'
+    for match in re.finditer(pattern2, review_text, re.IGNORECASE | re.DOTALL):
+        findings.append({
+            "line": match.group(1),
+            "finding": match.group(2).strip()[:300]
+        })
+    
+    # Pattern 3: Compact format "Line: 123 ... Severity: Critical ... Finding: text"
+    pattern3 = rf'Line:\s*(\d+).*?Severity:\s*{severity}.*?Finding:\s*(.*?)(?=\nLine:|\nFile:|\n###|\Z)'
+    for match in re.finditer(pattern3, review_text, re.IGNORECASE | re.DOTALL):
+        findings.append({
+            "line": match.group(1),
+            "finding": match.group(2).strip()[:300]
+        })
+    
+    # Pattern 4: Just severity and finding, try to find nearest line number
+    pattern4 = rf'\*\*Severity:\*\*\s*{severity}.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*Severity:|\n\*\*File:|\n###|\Z)'
+    for match in re.finditer(pattern4, review_text, re.IGNORECASE | re.DOTALL):
+        finding_text = match.group(1).strip()[:300]
+        # Look backwards for a line number
+        preceding_text = review_text[:match.start()]
+        line_match = re.search(r'\*\*Line:\*\*\s*(\d+)', preceding_text[-200:])
+        if line_match:
+            findings.append({
+                "line": line_match.group(1),
+                "finding": finding_text
+            })
+        else:
+            findings.append({
+                "line": "N/A",
+                "finding": finding_text
+            })
+    
+    # Remove duplicates (same finding text)
+    seen = set()
+    unique_findings = []
+    for f in findings:
+        finding_key = f["finding"][:100]  # Use first 100 chars as key
+        if finding_key not in seen:
+            seen.add(finding_key)
+            unique_findings.append(f)
+    
+    return unique_findings
+
 def extract_critical_findings_from_review(review_text: str, filename: str) -> dict:
     """
-    Extract only critical/high severity findings WITH LINE NUMBERS and key summary from review text.
-    This preserves important information while drastically reducing size.
+    Extract only critical/high severity findings WITH LINE NUMBERS and key summary.
+    Uses multiple regex patterns to handle various review formats.
     """
     result = {
         "filename": filename,
@@ -102,84 +162,28 @@ def extract_critical_findings_from_review(review_text: str, filename: str) -> di
     lines = review_text.split('\n')
     summary_lines = []
     for line in lines[:20]:
-        if line.strip() and not line.startswith('#') and not line.startswith('**'):
+        if line.strip() and not line.startswith('#') and not line.startswith('**') and not line.startswith('-'):
             summary_lines.append(line.strip())
             if len(' '.join(summary_lines)) > 500:
                 break
     result["summary"] = ' '.join(summary_lines)[:500]
     
     # Extract severity counts
-    critical_matches = re.findall(r'\*\*Severity:\*\*\s*Critical', review_text, re.IGNORECASE)
-    high_matches = re.findall(r'\*\*Severity:\*\*\s*High', review_text, re.IGNORECASE)
-    medium_matches = re.findall(r'\*\*Severity:\*\*\s*Medium', review_text, re.IGNORECASE)
-    low_matches = re.findall(r'\*\*Severity:\*\*\s*Low', review_text, re.IGNORECASE)
+    result["stats"]["critical"] = len(re.findall(r'\*\*Severity:\*\*\s*Critical', review_text, re.IGNORECASE))
+    result["stats"]["high"] = len(re.findall(r'\*\*Severity:\*\*\s*High', review_text, re.IGNORECASE))
+    result["stats"]["medium"] = len(re.findall(r'\*\*Severity:\*\*\s*Medium', review_text, re.IGNORECASE))
+    result["stats"]["low"] = len(re.findall(r'\*\*Severity:\*\*\s*Low', review_text, re.IGNORECASE))
     
-    result["stats"]["critical"] = len(critical_matches)
-    result["stats"]["high"] = len(high_matches)
-    result["stats"]["medium"] = len(medium_matches)
-    result["stats"]["low"] = len(low_matches)
-    
-    # ENHANCED: Extract critical findings WITH line numbers
-    # Pattern: **Line:** 123 ... **Severity:** Critical ... **Finding:** text
-    critical_pattern = r'\*\*Line:\*\*\s*(\d+).*?\*\*Severity:\*\*\s*Critical.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*Line:|\n\*\*File:|$)'
-    for match in re.finditer(critical_pattern, review_text, re.IGNORECASE | re.DOTALL):
-        line_num = match.group(1)
-        finding_text = match.group(2).strip()[:300]
-        result["critical_findings"].append({
-            "line": line_num,
-            "finding": finding_text
-        })
-    
-    # If no line numbers found, try alternative pattern without line numbers
-    if not result["critical_findings"]:
-        critical_pattern_alt = r'\*\*Severity:\*\*\s*Critical.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*Severity:|\n\*\*File:|$)'
-        for match in re.finditer(critical_pattern_alt, review_text, re.IGNORECASE | re.DOTALL):
-            finding_text = match.group(1).strip()[:300]
-            result["critical_findings"].append({
-                "line": "N/A",
-                "finding": finding_text
-            })
-    
-    # ENHANCED: Extract high findings WITH line numbers
-    high_pattern = r'\*\*Line:\*\*\s*(\d+).*?\*\*Severity:\*\*\s*High.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*Line:|\n\*\*File:|$)'
-    for match in re.finditer(high_pattern, review_text, re.IGNORECASE | re.DOTALL):
-        line_num = match.group(1)
-        finding_text = match.group(2).strip()[:250]
-        result["high_findings"].append({
-            "line": line_num,
-            "finding": finding_text
-        })
-    
-    # If no line numbers found, try alternative pattern
-    if not result["high_findings"]:
-        high_pattern_alt = r'\*\*Severity:\*\*\s*High.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*Severity:|\n\*\*File:|$)'
-        for match in re.finditer(high_pattern_alt, review_text, re.IGNORECASE | re.DOTALL):
-            finding_text = match.group(1).strip()[:250]
-            result["high_findings"].append({
-                "line": "N/A",
-                "finding": finding_text
-            })
-    
-    # ENHANCED: Extract some medium findings WITH line numbers (limit to top 5)
-    medium_pattern = r'\*\*Line:\*\*\s*(\d+).*?\*\*Severity:\*\*\s*Medium.*?\*\*Finding:\*\*\s*(.*?)(?=\n\*\*Line:|\n\*\*File:|$)'
-    medium_count = 0
-    for match in re.finditer(medium_pattern, review_text, re.IGNORECASE | re.DOTALL):
-        if medium_count >= 5:
-            break
-        line_num = match.group(1)
-        finding_text = match.group(2).strip()[:150]
-        result["medium_findings"].append({
-            "line": line_num,
-            "finding": finding_text
-        })
-        medium_count += 1
+    # Extract findings with line numbers using robust multi-pattern approach
+    result["critical_findings"] = extract_findings_with_line_numbers(review_text, "Critical")
+    result["high_findings"] = extract_findings_with_line_numbers(review_text, "High")[:15]  # Limit to 15
+    result["medium_findings"] = extract_findings_with_line_numbers(review_text, "Medium")[:5]  # Limit to 5
     
     return result
 
 def create_condensed_reviews(all_reviews: list) -> str:
     """
-    Create a condensed version of reviews that preserves critical information INCLUDING LINE NUMBERS
-    but fits within token limits. This is MUCH better than blind truncation.
+    Create a condensed version of reviews that preserves critical information INCLUDING LINE NUMBERS.
     """
     condensed = []
     total_original_size = 0
@@ -236,10 +240,9 @@ def calculate_executive_quality_score(findings: list, total_lines_of_code: int) 
         elif severity == "Low":
             severity_counts["Low"] += 1
         else:
-            print(f"    UNRECOGNIZED SEVERITY: '{severity}' in finding: {finding.get('finding', 'Unknown')[:50]}... - SKIPPING")
+            print(f"    UNRECOGNIZED SEVERITY: '{severity}' - SKIPPING")
             continue
         print(f"    - {severity}: {finding.get('finding', 'No description')[:50]}...")
-        line_num = finding.get("line_number", "N/A")
         total_affected_lines += 1
     print(f"  Severity breakdown: Critical={severity_counts['Critical']}, High={severity_counts['High']}, Medium={severity_counts['Medium']}, Low={severity_counts['Low']}")
     for severity, count in severity_counts.items():
@@ -264,19 +267,19 @@ def calculate_executive_quality_score(findings: list, total_lines_of_code: int) 
                 else:
                     deduction = min(10, deduction)
             total_deductions += deduction
-            print(f"    {severity}: {count} issues = -{deduction:.1f} points (capped)")
+            print(f"    {severity}: {count} issues = -{deduction:.1f} points")
     if total_lines_of_code > 0:
         affected_ratio = total_affected_lines / total_lines_of_code
         if affected_ratio > 0.4:
             coverage_penalty = min(5, int(affected_ratio * 20))
             total_deductions += coverage_penalty
-            print(f"    Coverage penalty: -{coverage_penalty} points ({affected_ratio:.1%} affected)")
+            print(f"    Coverage penalty: -{coverage_penalty} points")
     if severity_counts["Critical"] >= 3:
         total_deductions += 10
-        print(f"    Executive threshold penalty: -10 points (3+ critical issues)")
+        print(f"    Executive threshold penalty: -10 points")
     if severity_counts["Critical"] + severity_counts["High"] >= 20:
         total_deductions += 5
-        print(f"    Production readiness penalty: -5 points (20+ critical/high issues)")
+        print(f"    Production readiness penalty: -5 points")
     final_score = max(0, base_score - int(total_deductions))
     print(f"  Final calculation: {base_score} - {int(total_deductions)} = {final_score}")
     if final_score >= 85:
