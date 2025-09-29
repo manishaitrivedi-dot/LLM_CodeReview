@@ -9430,3 +9430,4 @@ class Forecast(AnalyticLib):
     def _PREDICTIONS_XCORR_SUMMARY(self):
         """Build method for PREDICTIONS_XCORR_SUMMARY"""
         return self._generic_summary("PREDICTIONS_XCORR")
+
