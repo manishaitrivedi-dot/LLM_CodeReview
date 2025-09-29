@@ -36,12 +36,12 @@ jobs:
           echo "Repository: ${{ github.repository }}"
           echo "PR Number: ${{ github.event.pull_request.number }}"
           echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
-          echo "Files in 1bigfile+1smallerfiles directory:"
-          ls -la 1bigfile+1smallerfiles/ || echo "No test directory found"
-          find . -name "*.py" -o -name "*.sql" | grep -E "(1bigfile+1smallerfiles/|scripts/)" || echo "No Python/SQL files found"
+          echo "Files in 3bigfile+3smallerfiles directory:"
+          ls -la 3bigfile+3smallerfiles/ || echo "No test directory found"
+          find . -name "*.py" -o -name "*.sql" | grep -E "(3bigfile+3smallerfiles/|scripts/)" || echo "No Python/SQL files found"
       
       - name: Run code review analysis
-        run: python scripts/main.py 1bigfile+1smallerfiles reviews ${{ github.event.pull_request.number }} ${{ github.event.pull_request.head.sha }}
+        run: python scripts/main.py 3bigfile+3smallerfiles reviews ${{ github.event.pull_request.number }} ${{ github.event.pull_request.head.sha }}
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
