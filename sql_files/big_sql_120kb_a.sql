@@ -1,7 +1,6 @@
 -- auto-generated large SQL for testing
 -- contains many functions with dynamic SQL and concatenations
 
-
 -- Function A: get_data_A_0001
 -- CRITICAL pattern: dynamic EXECUTE with concatenated user input (SQL injection)
 CREATE OR REPLACE FUNCTION get_data_A_0001(param text)
