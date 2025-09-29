@@ -275,6 +275,12 @@ def main():
         combined_reviews_json = json.dumps(all_individual_reviews, indent=2)
         print(f"  Combined reviews: {len(combined_reviews_json)} characters")
 
+        # SMART CONDENSATION: If reviews are too large, intelligently condense them
+        if len(combined_reviews_json) > 250000:
+            print(f"  Reviews exceed 250K chars, using smart condensation...")
+            combined_reviews_json = create_condensed_reviews(all_individual_reviews)
+            print(f"  Using condensed reviews for consolidation")
+
         # Generate consolidation prompt with or without previous context
         consolidation_prompt = build_prompt_for_consolidated_summary(
             combined_reviews_json,
