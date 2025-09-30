@@ -44,7 +44,7 @@ jobs:
         run: |
           mkdir -p ~/.snowflake
           cat <<EOT > ~/.snowflake/sf_private_key.p8
-          ${{ secrets.secrets.PRIVATE_KEY_PATH }}
+          ${{ secrets.PRIVATE_KEY_PATH }}
           EOT
           chmod 0600 ~/.snowflake/sf_private_key.p8
           
