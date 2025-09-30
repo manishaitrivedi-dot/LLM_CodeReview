@@ -27,7 +27,78 @@ jobs:
           python-version: '3.11'
       
       - name: Install dependencies
-        run: pip install snowflake-connector-python tiktoken whatthepatch snowflake-snowpark-python snowflake-ml-python pandas requests
+        run: pip install snowflake-connector-python tiktoken whatthepatch snowflake-snowpark-python snowflake-ml-python pandas requests name: Code Review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+  
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    environment: Snowflake Credentials
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install snowflake-connector-python tiktoken whatthepatch snowflake-snowpark-python snowflake-ml-python pandas requests cryptography
+      
+      - name: Create output directory
+        run: mkdir -p reviews
+      
+      - name: Debug environment
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
+          echo "Files in sql_files directory:"
+          ls -la sql_files/ || echo "No test directory found"
+          find . -name "*.py" -o -name "*.sql" | grep -E "(sql_files/|scripts/)" || echo "No Python/SQL files found"
+
+      - name: Create Private Key
+        run: |
+          mkdir -p ~/.snowflake
+          cat <<EOT > ~/.snowflake/sf_private_key.p8
+          ${{ secrets.PRIVATE_KEY_PATH }}
+          EOT
+          chmod 0600 ~/.snowflake/sf_private_key.p8
+          
+      - name: Run code review analysis
+        run: python scripts/main.py sql_files reviews ${{ github.event.pull_request.number }} ${{ github.event.pull_request.head.sha }}
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          
+      - name: Upload review outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: review-outputs
+          path: reviews/
+      
+      - name: Post review comments
+        run: python scripts/inline_comment.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+        continue-on-error: true
+
       
       - name: Create output directory
         run: mkdir -p reviews
