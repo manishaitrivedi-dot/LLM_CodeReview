@@ -1,6 +1,6 @@
 -- sql_dynamic_mysql.sql
 -- CRITICAL: dynamic SQL built by concatenation and EXECUTED
-
+ 
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100)
