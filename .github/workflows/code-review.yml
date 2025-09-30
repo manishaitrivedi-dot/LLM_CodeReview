@@ -53,7 +53,6 @@ jobs:
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PRIVKEY: ${{ secrets.PRIVATE_KEY_PATH }}
 
       - name: Upload review outputs
         uses: actions/upload-artifact@v4
