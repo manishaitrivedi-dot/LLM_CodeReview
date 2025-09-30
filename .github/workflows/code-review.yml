@@ -27,7 +27,7 @@ jobs:
           python-version: '3.11'
       
       - name: Install dependencies
-        run: pip install snowflake-connector-python tiktoken whatthepatch snowflake-snowpark-python snowflake-ml-python pandas requests
+        run: pip install snowflake-connector-python tiktoken whatthepatch snowflake-snowpark-python snowflake-ml-python pandas requests cryptography
       
       - name: Create output directory
         run: mkdir -p reviews
