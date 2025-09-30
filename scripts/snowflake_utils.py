@@ -2,7 +2,7 @@
 
 import os, sys, json
 from snowflake.snowpark import Session
-from snowflake.snowpark import Session
+import snowflake.connector
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
