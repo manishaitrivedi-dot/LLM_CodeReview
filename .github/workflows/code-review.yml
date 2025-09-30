@@ -13,6 +13,7 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
+    environment: Snowflake Credentials
     if: github.event_name == 'pull_request'
     
     steps:
