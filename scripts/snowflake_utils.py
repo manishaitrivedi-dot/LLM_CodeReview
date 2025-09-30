@@ -34,7 +34,7 @@ def get_snowflake_config():
             "account": os.getenv("SNOWFLAKE_ACCOUNT"),
             "user": os.getenv("SNOWFLAKE_USER"),
             #"password": os.getenv("SNOWFLAKE_PASSWORD"),
-            "private_key_path": private_key_bytes,
+            "private_key": private_key_bytes,
             "authenticator": "SNOWFLAKE_JWT",
             #"role": os.getenv("SNOWFLAKE_ROLE", "SYSADMIN"),
             #"warehouse": os.getenv("SNOWFLAKE_WAREHOUSE"),
