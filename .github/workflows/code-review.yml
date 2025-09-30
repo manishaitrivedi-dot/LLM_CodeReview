@@ -45,12 +45,16 @@ jobs:
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-      
+          SNOWFLAKE_PRIVKEY: ${{ secrets.PRIVATE_KEY_PATH}}
+          
+      - name: Create Private Key
+        run: |
+          mkdir -p ~/.snowflake
+          cat <<EOT > ~/.snowflake/sf_private_key.p8
+          ${{ env.SNOWFLAKE_PRIVKEY }}
+          EOT
+          chmod 0600 ~/.snowflake/sf_private_key.p8
+          
       - name: Upload review outputs
         uses: actions/upload-artifact@v4
         if: always()
