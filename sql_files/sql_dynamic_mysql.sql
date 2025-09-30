@@ -1,4 +1,4 @@
--- sql_dynamic_mysql.sql
+-- sql_dynamic_mysql.sql 
 -- CRITICAL: dynamic SQL built by concatenation and EXECUTED
  
 CREATE TABLE IF NOT EXISTS users (
