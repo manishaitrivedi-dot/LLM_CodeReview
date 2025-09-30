@@ -39,14 +39,7 @@ jobs:
           echo "Files in sql_files directory:"
           ls -la sql_files/ || echo "No test directory found"
           find . -name "*.py" -o -name "*.sql" | grep -E "(sql_files/|scripts/)" || echo "No Python/SQL files found"
-      
-      - name: Run code review analysis
-        run: python scripts/main.py sql_files reviews ${{ github.event.pull_request.number }} ${{ github.event.pull_request.head.sha }}
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PRIVKEY: ${{ secrets.PRIVATE_KEY_PATH}}
-          
+
       - name: Create Private Key
         run: |
           mkdir -p ~/.snowflake
@@ -55,6 +48,12 @@ jobs:
           EOT
           chmod 0600 ~/.snowflake/sf_private_key.p8
           
+      - name: Run code review analysis
+        run: python scripts/main.py sql_files reviews ${{ github.event.pull_request.number }} ${{ github.event.pull_request.head.sha }}
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+     
       - name: Upload review outputs
         uses: actions/upload-artifact@v4
         if: always()
