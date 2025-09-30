@@ -3,30 +3,38 @@
 import os, sys, json
 from snowflake.snowpark import Session
 import snowflake.connector
-# from cryptography.hazmat.primitives import serialization
-# from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 
 
 PRIVATE_KEY_PATH = os.path.expanduser("~/.snowflake/sf_private_key.p8")
 
-# def load_private_key():
-#     with open(PRIVATE_KEY_PATH, "rb") as key:
-#         p_key = serialization.load_pem_private_key(
-#             key.read(),
-#             password=None,  # or b"your-passphrase" if the key has one
-#             backend=default_backend()
-#         )
-#     return p_key
+def load_private_key(path=PRIVATE_KEY_PATH):
+    """Load private key and convert to DER bytes for Snowflake"""
+    with open(path, "rb") as key_file:
+        p_key = serialization.load_pem_private_key(
+            key_file.read(),
+            password=None,  # or b"passphrase" if encrypted
+            backend=default_backend()
+        )
+    # Convert to bytes for Snowflake connector
+    pkb = p_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    return pkb
     
 def get_snowflake_config():
     """Get Snowflake configuration with fallbacks"""
+    private_key_bytes = load_private_key()
     if os.getenv("SNOWFLAKE_ACCOUNT"):
         print("Using environment variable configuration")
         return {
             "account": os.getenv("SNOWFLAKE_ACCOUNT"),
             "user": os.getenv("SNOWFLAKE_USER"),
             #"password": os.getenv("SNOWFLAKE_PASSWORD"),
-            "private_key_path": PRIVATE_KEY_PATH,
+            "private_key_path": private_key_bytes,
             "authenticator": "SNOWFLAKE_JWT",
             #"role": os.getenv("SNOWFLAKE_ROLE", "SYSADMIN"),
             #"warehouse": os.getenv("SNOWFLAKE_WAREHOUSE"),
