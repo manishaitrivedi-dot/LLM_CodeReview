@@ -35,6 +35,7 @@ def get_snowflake_config():
 
 def get_snowflake_session():
     """Initialize Snowflake session with configuration"""
+    print("DEBUG: SNOWFLAKE_ACCOUNT =", os.getenv("SNOWFLAKE_ACCOUNT"))
     cfg = get_snowflake_config()
     required_fields = ["account", "user", "private_key_path"]
     missing_fields = [field for field in required_fields if not cfg.get(field)]
