@@ -2,7 +2,7 @@
 
 import os, sys, json
 from snowflake.snowpark import Session
-
+PRIVATE_KEY_PATH = os.path.expanduser("~/.snowflake/sf_private_key.p8")
 def get_snowflake_config():
     """Get Snowflake configuration with fallbacks"""
     if os.getenv("SNOWFLAKE_ACCOUNT"):
@@ -10,23 +10,28 @@ def get_snowflake_config():
         return {
             "account": os.getenv("SNOWFLAKE_ACCOUNT"),
             "user": os.getenv("SNOWFLAKE_USER"),
-            "password": os.getenv("SNOWFLAKE_PASSWORD"),
-            "role": os.getenv("SNOWFLAKE_ROLE", "SYSADMIN"),
-            "warehouse": os.getenv("SNOWFLAKE_WAREHOUSE"),
-            "database": os.getenv("SNOWFLAKE_DATABASE"),
-            "schema": os.getenv("SNOWFLAKE_SCHEMA"),
-        }
-    else:
-        print("Environment variables not found, using fallback configuration")
-        return {
-            "account": "XKB93357.us-west-2",
-            "user": "MANISHAT007",
-            "password": "Welcome@987654321",
+            #"password": os.getenv("SNOWFLAKE_PASSWORD"),
+            "private_key_path": PRIVATE_KEY_PATH,
+            #"role": os.getenv("SNOWFLAKE_ROLE", "SYSADMIN"),
+            #"warehouse": os.getenv("SNOWFLAKE_WAREHOUSE"),
+            #"database": os.getenv("SNOWFLAKE_DATABASE"),
+            #"schema": os.getenv("SNOWFLAKE_SCHEMA"),
             "role": "SYSADMIN",
             "warehouse": "COMPUTE_WH",
             "database": "MY_DB",
             "schema": "PUBLIC",
         }
+    # else:
+    #     print("Environment variables not found, using fallback configuration")
+    #     return {
+    #         "account": "XKB93357.us-west-2",
+    #         "user": "MANISHAT007",
+    #         "password": "Welcome@987654321",
+    #         "role": "SYSADMIN",
+    #         "warehouse": "COMPUTE_WH",
+    #         "database": "MY_DB",
+    #         "schema": "PUBLIC",
+    #     }
 
 def get_snowflake_session():
     """Initialize Snowflake session with configuration"""
