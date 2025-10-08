@@ -1,4 +1,4 @@
-name: Cleanup PR Comments
+name: Cleanup PR Comments and Database
 
 on:
   pull_request:
@@ -14,7 +14,105 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Delete PR comments
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install snowflake-connector-python cryptography
+      
+      - name: Create Private Key
+        run: |
+          mkdir -p ~/.snowflake
+          cat <<EOT > ~/.snowflake/sf_private_key.p8
+          ${{ secrets.PRIVATE_KEY_PATH }}
+          EOT
+          chmod 0600 ~/.snowflake/sf_private_key.p8
+      
+      - name: Delete Snowflake records
+        run: |
+          python - <<'EOF'
+          import os
+          import sys
+          from snowflake.snowpark import Session
+          from cryptography.hazmat.primitives import serialization
+          from cryptography.hazmat.backends import default_backend
+          
+          PRIVATE_KEY_PATH = os.path.expanduser("~/.snowflake/sf_private_key.p8")
+          
+          def load_private_key(path=PRIVATE_KEY_PATH):
+              with open(path, "rb") as key_file:
+                  p_key = serialization.load_pem_private_key(
+                      key_file.read(),
+                      password=None,
+                      backend=default_backend()
+                  )
+              pkb = p_key.private_bytes(
+                  encoding=serialization.Encoding.DER,
+                  format=serialization.PrivateFormat.PKCS8,
+                  encryption_algorithm=serialization.NoEncryption()
+              )
+              return pkb
+          
+          try:
+              pr_number = ${{ github.event.pull_request.number }}
+              print(f"Deleting Snowflake records for PR #{pr_number}")
+              
+              private_key_bytes = load_private_key()
+              
+              cfg = {
+                  "account": os.getenv("SNOWFLAKE_ACCOUNT"),
+                  "user": os.getenv("SNOWFLAKE_USER"),
+                  "private_key": private_key_bytes,
+                  "authenticator": "SNOWFLAKE_JWT",
+                  "role": "SYSADMIN",
+                  "warehouse": "COMPUTE_WH",
+                  "database": "MY_DB",
+                  "schema": "PUBLIC",
+              }
+              
+              session = Session.builder.configs(cfg).create()
+              print(f"✅ Connected to Snowflake: {cfg['account']} as {cfg['user']}")
+              
+              # Check if table exists
+              check_query = """
+              SELECT COUNT(*) as count 
+              FROM MY_DB.PUBLIC.CODE_REVIEW_LOG 
+              WHERE PULL_REQUEST_NUMBER = ?
+              """
+              result = session.sql(check_query, params=[pr_number]).collect()
+              record_count = result[0]['COUNT']
+              
+              print(f"Found {record_count} records for PR #{pr_number}")
+              
+              if record_count > 0:
+                  # Delete records for this PR
+                  delete_query = """
+                  DELETE FROM MY_DB.PUBLIC.CODE_REVIEW_LOG 
+                  WHERE PULL_REQUEST_NUMBER = ?
+                  """
+                  session.sql(delete_query, params=[pr_number]).collect()
+                  print(f"✅ Deleted {record_count} records from Snowflake")
+              else:
+                  print("No records to delete")
+              
+              session.close()
+              print("🔒 Snowflake session closed")
+              
+          except Exception as e:
+              print(f"⚠️ Error deleting Snowflake records: {e}")
+              import traceback
+              traceback.print_exc()
+              # Don't fail the workflow if Snowflake deletion fails
+              sys.exit(0)
+          EOF
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      
+      - name: Delete GitHub PR comments
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -22,7 +120,7 @@ jobs:
             const pr_number = context.payload.pull_request.number;
             const repo = context.repo;
             
-            console.log(`Cleaning up comments for PR #${pr_number}`);
+            console.log(`Cleaning up GitHub comments for PR #${pr_number}`);
             
             // Get all issue comments (general PR comments)
             const issueComments = await github.rest.issues.listComments({
@@ -33,7 +131,7 @@ jobs:
             
             console.log(`Found ${issueComments.data.length} issue comments`);
             
-            // Delete issue comments from the bot - match any of these phrases
+            // Delete issue comments from the bot
             let deletedIssueComments = 0;
             for (const comment of issueComments.data) {
               console.log(`Comment ${comment.id} by ${comment.user.login}`);
@@ -62,7 +160,7 @@ jobs:
             
             console.log(`Found ${reviewComments.data.length} review comments`);
             
-            // Delete review comments from the bot - match any of these phrases
+            // Delete review comments from the bot
             let deletedReviewComments = 0;
             for (const comment of reviewComments.data) {
               console.log(`Review comment ${comment.id} by ${comment.user.login}`);
@@ -81,4 +179,4 @@ jobs:
             }
             
             console.log(`Deleted ${deletedReviewComments} review comments`);
-            console.log(`Cleanup completed: ${deletedIssueComments} issue comments + ${deletedReviewComments} review comments deleted`);
+            console.log(`GitHub cleanup completed: ${deletedIssueComments} issue comments + ${deletedReviewComments} review comments deleted`);
